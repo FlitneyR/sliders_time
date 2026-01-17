@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "app_prv.h": "c",
+        "macros.h": "c",
+        "pebble.h": "c",
+        "message_keys.auto.h": "c",
+        "pebble_fonts.h": "c",
+        "resource_ids.auto.h": "c"
+    }
+}

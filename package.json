@@ -1,0 +1,39 @@
+{
+  "name": "sliders_time",
+  "author": "MakeAwesomeHappen",
+  "version": "1.0.0",
+  "keywords": [
+    "pebble-app"
+  ],
+  "private": true,
+  "dependencies": {
+    "pebble-clay": "^1.0.4"
+  },
+  "pebble": {
+    "displayName": "SliderTime",
+    "uuid": "fef3958f-9b9c-4ac6-8aa0-4edaa8dab4a2",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "diorite",
+      "emery"
+    ],
+    "watchapp": {
+      "watchface": true
+    },
+    "messageKeys": [
+      "PrimaryForegroundColour",
+      "PrimaryBackgroundColour",
+      "SecondaryForegroundColour",
+      "SecondaryBackgroundColour"
+    ],
+    "resources": {
+      "media": []
+    },
+    "capabilities": [
+      "configurable"
+    ]
+  }
+}

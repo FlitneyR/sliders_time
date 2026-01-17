@@ -1,0 +1,52 @@
+[
+    {
+        "type": "heading",
+        "defaultValue": "Ribbon Face Configuration"
+    },
+    {
+        "type": "section",
+        "items": [
+            {
+                "type": "heading",
+                "defaultValue": "Primary Colours"
+            },
+            {
+                "type": "color",
+                "messageKey": "PrimaryForegroundColour",
+                "defaultValue": "0xFFFFFFFF",
+                "label": "Foreground Colour"
+            },
+            {
+                "type": "color",
+                "messageKey": "PrimaryBackgroundColour",
+                "defaultValue": "0xFF0000FF",
+                "label": "Background Colour"
+            }
+        ]
+    },
+    {
+        "type": "section",
+        "items": [
+            {
+                "type": "heading",
+                "defaultValue": "Secondary Colours"
+            },
+            {
+                "type": "color",
+                "messageKey": "SecondaryForegroundColour",
+                "defaultValue": "0xFFFFFFFF",
+                "label": "Foreground Colour"
+            },
+            {
+                "type": "color",
+                "messageKey": "SecondaryBackgroundColour",
+                "defaultValue": "0xAA0000FF",
+                "label": "Background Colour"
+            }
+        ]
+    },
+    {
+        "type": "submit",
+        "defaultValue": "Submit"
+    }
+]
