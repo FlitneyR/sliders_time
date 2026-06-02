@@ -10,6 +10,8 @@ struct App {
 
     TimeSliderData timeSliderData;
 
+    bool perSecondUpdate;
+
     // Slider* yearSlider;
     Slider* monthSlider;
     Slider* daySlider;
@@ -23,6 +25,7 @@ void app_deinit( App app[ static 1 ] );
 void app_init_layout( App app[ static 1 ] );
 void app_destroy_layout( App app[ static 1 ] );
 
+TimeUnits app_get_tick_rate( App app[ static 1 ] );
 void app_on_tick( App app[ static 1 ], const tm time[ static 1 ], TimeUnits units );
 
 #endif // APP_PRV_H

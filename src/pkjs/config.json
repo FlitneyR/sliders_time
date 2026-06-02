@@ -46,6 +46,17 @@
         ]
     },
     {
+        "type": "section",
+        "items": [
+            {
+                "type": "toggle",
+                "messageKey": "PerSecondUpdate",
+                "label": "Per-second update",
+                "defaultValue": "false"
+            }
+        ]
+    },
+    {
         "type": "submit",
         "defaultValue": "Submit"
     }

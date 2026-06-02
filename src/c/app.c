@@ -1,5 +1,6 @@
 #include "app_prv.h"
 #include "macros.h"
+#include "persistant_data_codes.h"
 
 // #pragma region App public interface
 
@@ -32,13 +33,14 @@ void app_destroy( App* app )
 
 static void on_tick( tm* time, TimeUnits units ) { app_on_tick( window_get_user_data( window_stack_get_top_window() ), time, units ); }
 static void on_main_window_load( Window* window ) { app_init_layout( window_get_user_data( window ) ); }
-static void on_main_window_appear( Window* window ) { SUBSCRIBE_TICK_SERVER( on_tick, SECOND_UNIT ); }
+static void on_main_window_appear( Window* window ) { SUBSCRIBE_TICK_SERVER( on_tick, app_get_tick_rate( window_get_user_data( window ) ) ); }
 static void on_main_window_disappear( Window* window ) { tick_timer_service_unsubscribe(); }
 static void on_main_window_unload( Window* window ) { app_destroy_layout( window_get_user_data( window ) ); }
 
 bool app_init( App app[ static 1 ] )
 {
     *app = (App){ 0 };
+    app->perSecondUpdate = persist_read_bool( PER_SECOND_UPDATE );
 
     app_message_open( 1024, 0 );
 
@@ -87,48 +89,51 @@ void received_callback( DictionaryIterator* iterator, void* context )
     const Tuple* const fg_color = dict_find( iterator, MESSAGE_KEY_PrimaryForegroundColour );
     const Tuple* const bg_color_alt = dict_find( iterator, MESSAGE_KEY_SecondaryBackgroundColour );
     const Tuple* const fg_color_alt = dict_find( iterator, MESSAGE_KEY_SecondaryForegroundColour );
+    const Tuple* const per_second_update = dict_find( iterator, MESSAGE_KEY_PerSecondUpdate );
 
-    if (bg_color)
+    if ( bg_color )
     {
-        APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved background color: %d", bg_color->value->uint8);
-        slider_set_background_color( app->daySlider, (GColor8){ .argb=bg_color->value->uint8 } );
-        slider_set_background_color( app->minuteSlider, (GColor8){ .argb=bg_color->value->uint8 } );
+        // APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved background color: %d", bg_color->value->uint32);
+        persist_write_int( PRIMARY_BACKGROUND_COLOR, bg_color->value->int32 );
+        slider_set_background_color( app->daySlider, GColorFromHEX( bg_color->value->int32 ) );
+        slider_set_background_color( app->minuteSlider, GColorFromHEX( bg_color->value->int32 ) );
     }
 
-    if (fg_color)
+    if ( fg_color )
     {
-        APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved foreground color: %d", fg_color->value->uint8);
-        slider_set_foreground_color( app->daySlider, (GColor8){ .argb=fg_color->value->uint8 } );
-        slider_set_foreground_color( app->minuteSlider, (GColor8){ .argb=fg_color->value->uint8 } );
+        // APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved foreground color: %d", fg_color->value->uint32);
+        persist_write_int( PRIMARY_FOREGROUND_COLOR, fg_color->value->int32 );
+        slider_set_foreground_color( app->daySlider, GColorFromHEX( fg_color->value->int32 ) );
+        slider_set_foreground_color( app->minuteSlider, GColorFromHEX( fg_color->value->int32 ) );
     }
 
-    if (bg_color_alt)
+    if ( bg_color_alt )
     {
-        APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved background color: %d", bg_color_alt->value->uint8);
-        slider_set_background_color( app->monthSlider, (GColor8){ .argb=bg_color_alt->value->uint8 } );
-        slider_set_background_color( app->hourSlider, (GColor8){ .argb=bg_color_alt->value->uint8 } );
+        // APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved alt background color: %d", bg_color_alt->value->uint32);
+        persist_write_int( SECONDARY_BACKGROUND_COLOR, bg_color_alt->value->int32 );
+        slider_set_background_color( app->monthSlider, GColorFromHEX( bg_color_alt->value->int32 ) );
+        slider_set_background_color( app->hourSlider, GColorFromHEX( bg_color_alt->value->int32 ) );
     }
 
-    if (fg_color_alt)
+    if ( fg_color_alt )
     {
-        APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved foreground color: %d", fg_color_alt->value->uint8);
-        slider_set_foreground_color( app->monthSlider, (GColor8){ .argb=fg_color_alt->value->uint8 } );
-        slider_set_foreground_color( app->hourSlider, (GColor8){ .argb=fg_color_alt->value->uint8 } );
+        // APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved alt foreground color: %d", fg_color_alt->value->uint32);
+        persist_write_int( SECONDARY_FOREGROUND_COLOR, fg_color_alt->value->int32 );
+        slider_set_foreground_color( app->monthSlider, GColorFromHEX( fg_color_alt->value->int32 ) );
+        slider_set_foreground_color( app->hourSlider, GColorFromHEX( fg_color_alt->value->int32 ) );
+    }
+
+    if ( per_second_update )
+    {
+        app->perSecondUpdate = per_second_update->value->int8;
+        persist_write_bool( PER_SECOND_UPDATE, app->perSecondUpdate );
+        on_main_window_appear( app->window );
     }
 }
 
 void app_init_layout( App app[ static 1 ] )
 {
     const GSize window_size = layer_get_unobstructed_bounds( window_get_root_layer( app->window ) ).size;
-
-    // app->timeSliderData.bigFont = fonts_get_system_font( FONT_KEY_GOTHIC_24_BOLD );
-    // app->timeSliderData.bigFontBottomPadding = 10;
-
-    // app->timeSliderData.bigFont = fonts_get_system_font( FONT_KEY_GOTHIC_28_BOLD );
-    // app->timeSliderData.bigFontBottomPadding = 11;
-    
-    // app->timeSliderData.smallFont = fonts_get_system_font( FONT_KEY_GOTHIC_14_BOLD );
-    // app->timeSliderData.smallFontBottomPadding = 6;
 
     uint16_t month_height, day_height, hour_height, minute_height;
     month_height = day_height = hour_height = minute_height = 0;
@@ -164,20 +169,6 @@ void app_init_layout( App app[ static 1 ] )
         day_height = hour_height = minute_height = ( window_size.h - month_height ) / 3;
     }
 
-    // GUARD( app->yearSlider = slider_create( &(SliderCreateInfo){
-    //     .frame={
-    //         .origin={ 0, 0 * ( window_size.h / 5 ) },
-    //         .size={ window_size.w, window_size.h / 5 + 1 }
-    //     },
-
-    //     .showNeighbours = PBL_IF_ROUND_ELSE( 2, 1 ),
-    //     .backgroundColor = PBL_IF_COLOR_ELSE( GColorRed, GColorBlack ),
-    //     .foregroundColor = PBL_IF_COLOR_ELSE( GColorWhite, GColorWhite ),
-
-    //     .label_func=time_slider_year_label,
-    //     .progress_func=time_slider_year_progress,
-    // } ), goto give_up );
-
     // #define TRACE(fmt, expr) APP_LOG(APP_LOG_LEVEL_DEBUG, #expr " = " fmt, expr)
     #define TRACE(fmt, expr)
     TRACE("%p", time_slider_month_label);
@@ -186,14 +177,17 @@ void app_init_layout( App app[ static 1 ] )
     TRACE("%p", time_slider_minute_label);
     TRACE("%p", slider_create);
 
+    #define READ_PERSISTENT_COLOR( identifier, default )\
+        !persist_exists( identifier ) ? default : GColorFromHEX( persist_read_int( identifier ) )
+
     const ColorScheme cs = {
-        // .bg=GColorBlack, .fg=GColorWhite, .bg_alt=GColorBlack, .fg_alt=GColorWhite, // black and white
-        .bg=GColorRed, .fg=GColorWhite, .bg_alt=GColorDarkCandyAppleRed, .fg_alt=GColorWhite, // red
-        // .bg=GColorDukeBlue, .fg=GColorWhite, .bg_alt=GColorOxfordBlue, .fg_alt=GColorWhite, // blue 
-        // .bg=GColorRed, .fg=GColorWhite, .bg_alt=GColorBlue, .fg_alt=GColorWhite, // red and blue
-        // .bg=GColorRed, .fg=GColorWhite, .bg_alt=GColorDarkGreen, .fg_alt=GColorWhite, // red and green
-        // .bg=GColorLightGray, .fg=GColorWhite, .bg_alt=GColorDarkGray, .fg_alt=GColorWhite, // grey scale
+        .bg=READ_PERSISTENT_COLOR( PRIMARY_BACKGROUND_COLOR, GColorRed ),
+        .fg=READ_PERSISTENT_COLOR( PRIMARY_FOREGROUND_COLOR, GColorWhite ),
+        .bg_alt=READ_PERSISTENT_COLOR( SECONDARY_BACKGROUND_COLOR, GColorDarkCandyAppleRed ),
+        .fg_alt=READ_PERSISTENT_COLOR( SECONDARY_FOREGROUND_COLOR, GColorWhite ),
     };
+
+    #undef READ_PERSISTENT_COLOR
 
     SliderCreateInfo month_slider_create_info = {
          .frame={
@@ -308,9 +302,17 @@ void app_destroy_layout( App app[ static 1 ] )
 
 // #pragma endregion Init / Deinit
 
+TimeUnits app_get_tick_rate( App app[ static 1 ] )
+{
+    return app->perSecondUpdate ? SECOND_UNIT : MINUTE_UNIT;
+}
+
 void app_on_tick( App app[ static 1 ], const tm time[ static 1 ], TimeUnits units )
 {
     app->timeSliderData.time = *time;
+
+    if ( !app->perSecondUpdate )
+        app->timeSliderData.time.tm_sec = 30;
 
     // if ( units & MONTH_UNIT  ) slider_set_context( app->yearSlider,   &app->timeSliderData );
     /* if ( units & DAY_UNIT    ) */ slider_set_context( app->monthSlider,  &app->timeSliderData );

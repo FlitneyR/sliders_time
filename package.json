@@ -27,7 +27,8 @@
       "PrimaryForegroundColour",
       "PrimaryBackgroundColour",
       "SecondaryForegroundColour",
-      "SecondaryBackgroundColour"
+      "SecondaryBackgroundColour",
+      "PerSecondUpdate"
     ],
     "resources": {
       "media": []
