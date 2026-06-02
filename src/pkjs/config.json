@@ -13,13 +13,13 @@
             {
                 "type": "color",
                 "messageKey": "PrimaryForegroundColour",
-                "defaultValue": "0xFFFFFFFF",
+                "defaultValue": "0x000000",
                 "label": "Foreground Colour"
             },
             {
                 "type": "color",
                 "messageKey": "PrimaryBackgroundColour",
-                "defaultValue": "0xFF0000FF",
+                "defaultValue": "0xFFFFFF",
                 "label": "Background Colour"
             }
         ]
@@ -34,13 +34,13 @@
             {
                 "type": "color",
                 "messageKey": "SecondaryForegroundColour",
-                "defaultValue": "0xFFFFFFFF",
+                "defaultValue": "0xFFFFFF",
                 "label": "Foreground Colour"
             },
             {
                 "type": "color",
                 "messageKey": "SecondaryBackgroundColour",
-                "defaultValue": "0xAA0000FF",
+                "defaultValue": "0x000000",
                 "label": "Background Colour"
             }
         ]

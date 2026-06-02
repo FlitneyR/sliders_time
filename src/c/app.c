@@ -181,10 +181,10 @@ void app_init_layout( App app[ static 1 ] )
         !persist_exists( identifier ) ? default : GColorFromHEX( persist_read_int( identifier ) )
 
     const ColorScheme cs = {
-        .bg=READ_PERSISTENT_COLOR( PRIMARY_BACKGROUND_COLOR, GColorRed ),
+        .bg=READ_PERSISTENT_COLOR( PRIMARY_BACKGROUND_COLOR, GColorBlack ),
         .fg=READ_PERSISTENT_COLOR( PRIMARY_FOREGROUND_COLOR, GColorWhite ),
-        .bg_alt=READ_PERSISTENT_COLOR( SECONDARY_BACKGROUND_COLOR, GColorDarkCandyAppleRed ),
-        .fg_alt=READ_PERSISTENT_COLOR( SECONDARY_FOREGROUND_COLOR, GColorWhite ),
+        .bg_alt=READ_PERSISTENT_COLOR( SECONDARY_BACKGROUND_COLOR, GColorWhite ),
+        .fg_alt=READ_PERSISTENT_COLOR( SECONDARY_FOREGROUND_COLOR, GColorBlack ),
     };
 
     #undef READ_PERSISTENT_COLOR
