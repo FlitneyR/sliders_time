@@ -198,8 +198,8 @@ void app_init_layout( App app[ static 1 ] )
         },
 
         .showNeighbours = PBL_IF_ROUND_ELSE( 2, 1 ),
-        .backgroundColor = PBL_IF_COLOR_ELSE( cs.bg, GColorBlack ),
-        .foregroundColor = PBL_IF_COLOR_ELSE( cs.fg, GColorWhite ),
+        .backgroundColor = cs.bg,
+        .foregroundColor = cs.fg,
 
         .context = NULL,
         .label_func=_time_slider_month_label,
@@ -218,8 +218,8 @@ void app_init_layout( App app[ static 1 ] )
         },
 
         .showNeighbours = 1,
-        .backgroundColor = PBL_IF_COLOR_ELSE( cs.bg_alt, GColorBlack ),
-        .foregroundColor = PBL_IF_COLOR_ELSE( cs.fg_alt, GColorWhite ),
+        .backgroundColor = cs.bg_alt,
+        .foregroundColor = cs.fg_alt,
 
         .context = NULL,
         .label_func=_time_slider_day_label,
@@ -238,8 +238,8 @@ void app_init_layout( App app[ static 1 ] )
         },
 
         .showNeighbours = 2,
-        .backgroundColor = PBL_IF_COLOR_ELSE( cs.bg, GColorBlack ),
-        .foregroundColor = PBL_IF_COLOR_ELSE( cs.fg, GColorWhite ),
+        .backgroundColor = cs.bg,
+        .foregroundColor = cs.fg,
 
         .context = NULL,
         .label_func=_time_slider_hour_label,
@@ -258,8 +258,8 @@ void app_init_layout( App app[ static 1 ] )
         },
 
         .showNeighbours = 2,
-        .backgroundColor = PBL_IF_COLOR_ELSE( cs.bg_alt, GColorBlack ),
-        .foregroundColor = PBL_IF_COLOR_ELSE( cs.fg_alt, GColorWhite ),
+        .backgroundColor = cs.bg_alt,
+        .foregroundColor = cs.fg_alt,
 
         .context = NULL,
         .label_func=_time_slider_minute_label,

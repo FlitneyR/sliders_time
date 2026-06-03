@@ -1,6 +1,6 @@
 {
   "name": "sliders_time",
-  "author": "MakeAwesomeHappen",
+  "author": "Robert Flitney",
   "version": "1.0.0",
   "keywords": [
     "pebble-app"
@@ -10,7 +10,7 @@
     "pebble-clay": "^1.0.4"
   },
   "pebble": {
-    "displayName": "SliderTime",
+    "displayName": "Ticker Tape",
     "uuid": "fef3958f-9b9c-4ac6-8aa0-4edaa8dab4a2",
     "sdkVersion": "3",
     "enableMultiJS": true,
