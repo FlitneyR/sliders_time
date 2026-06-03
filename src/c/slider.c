@@ -116,9 +116,6 @@ void slider_layer_update_proc( Layer* layer, GContext* ctx )
     graphics_context_set_stroke_color( ctx, slider->foregroundColor );
     graphics_context_set_stroke_width( ctx, 1 );
 
-    graphics_draw_line( ctx, (GPoint){ 0, 0 }, (GPoint){ layer_size.w, 0 } );
-    graphics_draw_line( ctx, (GPoint){ 0, layer_size.h }, (GPoint){ layer_size.w, layer_size.h } );
-
     graphics_context_set_stroke_width( ctx, 2 );
     graphics_context_set_stroke_color( ctx, slider->foregroundColor );
     graphics_context_set_fill_color( ctx, slider->foregroundColor );
