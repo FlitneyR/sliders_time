@@ -14,13 +14,15 @@
                 "type": "color",
                 "messageKey": "PrimaryForegroundColour",
                 "defaultValue": "0x000000",
-                "label": "Foreground Colour"
+                "label": "Foreground Colour",
+                "sunlight": false
             },
             {
                 "type": "color",
                 "messageKey": "PrimaryBackgroundColour",
                 "defaultValue": "0xFFFFFF",
-                "label": "Background Colour"
+                "label": "Background Colour",
+                "sunlight": false
             }
         ]
     },
@@ -35,13 +37,15 @@
                 "type": "color",
                 "messageKey": "SecondaryForegroundColour",
                 "defaultValue": "0xFFFFFF",
-                "label": "Foreground Colour"
+                "label": "Foreground Colour",
+                "sunlight": false
             },
             {
                 "type": "color",
                 "messageKey": "SecondaryBackgroundColour",
                 "defaultValue": "0x000000",
-                "label": "Background Colour"
+                "label": "Background Colour",
+                "sunlight": false
             }
         ]
     },
