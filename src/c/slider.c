@@ -230,7 +230,14 @@ void time_slider_hour_label( Slider* slider, GContext* ctx, GRect bounds, int of
     offset_time.tm_hour += offset;
     memcpy( &offset_time, localtime( &(time_t){ mktime( &offset_time ) } ), sizeof( offset_time ) );
 
-    const uint8_t hour = offset_time.tm_hour;
+    uint8_t hour = offset_time.tm_hour;
+    if ( !clock_is_24h_style() )
+    {
+        if ( hour >= 12 )
+            hour -= 12;
+        if ( hour == 0 )
+            hour = 12;
+    }
 
     static char buffer[] = "__";
     FORMAT_BUFFER( buffer, "%02d", hour );
