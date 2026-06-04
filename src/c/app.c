@@ -155,18 +155,18 @@ void app_init_layout( App app[ static 1 ] )
     }
     else
     {
-        app->timeSliderData.dayFont = app->timeSliderData.hourFont = app->timeSliderData.minuteFont = (FontAndPadding){
+        app->timeSliderData.hourFont = app->timeSliderData.minuteFont = (FontAndPadding){
             .font = fonts_get_system_font( FONT_KEY_GOTHIC_28_BOLD ),
             .bottomPadding = 12,
         };
         
-        app->timeSliderData.monthFont = (FontAndPadding){
+        app->timeSliderData.dayFont = app->timeSliderData.monthFont = (FontAndPadding){
             .font = fonts_get_system_font( FONT_KEY_GOTHIC_14_BOLD ),
             .bottomPadding = 6,
         };
 
-        month_height = window_size.h / 6;
-        day_height = hour_height = minute_height = ( window_size.h - month_height ) / 3;
+        month_height = day_height = window_size.h / 6;
+        hour_height = minute_height = ( window_size.h - 2 * month_height ) / 2;
     }
 
     // #define TRACE(fmt, expr) APP_LOG(APP_LOG_LEVEL_DEBUG, #expr " = " fmt, expr)
