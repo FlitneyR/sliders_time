@@ -133,7 +133,7 @@ void received_callback( DictionaryIterator* iterator, void* context )
 
 void app_init_layout( App app[ static 1 ] )
 {
-    const GSize window_size = layer_get_unobstructed_bounds( window_get_root_layer( app->window ) ).size;
+    const GSize window_size = layer_get_bounds( window_get_root_layer( app->window ) ).size;
 
     uint16_t month_height, day_height, hour_height, minute_height;
     month_height = day_height = hour_height = minute_height = 0;
