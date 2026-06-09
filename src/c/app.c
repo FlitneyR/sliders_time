@@ -131,9 +131,53 @@ void received_callback( DictionaryIterator* iterator, void* context )
     }
 }
 
+void update_app_layout( App app[ static 1 ] )
+{
+    const GSize window_size = layer_get_unobstructed_bounds( window_get_root_layer( app->window ) ).size;
+
+    uint16_t month_height, day_height, hour_height, minute_height;
+    month_height = day_height = hour_height = minute_height = 0;
+
+    if ( preferred_content_size() >= PreferredContentSizeLarge )
+    {
+        month_height = day_height = window_size.h / 5;
+        hour_height = minute_height = ( window_size.h - month_height - day_height ) / 2;
+    }
+    else
+    {
+        month_height = day_height = window_size.h / 6;
+        hour_height = minute_height = ( window_size.h - 2 * month_height ) / 2;
+    }
+
+    layer_set_frame( slider_get_layer( app->monthSlider ), (GRect){
+        .origin={ 0, 0 },
+        .size={ window_size.w, month_height },
+    });
+
+    layer_set_frame( slider_get_layer( app->daySlider ), (GRect){
+        .origin={ 0, month_height },
+        .size={ window_size.w, day_height },
+    });
+
+    layer_set_frame( slider_get_layer( app->hourSlider ), (GRect){
+        .origin={ 0, month_height + day_height },
+        .size={ window_size.w, hour_height },
+    });
+
+    layer_set_frame( slider_get_layer( app->minuteSlider ), (GRect){
+        .origin={ 0, month_height + day_height + hour_height },
+        .size={ window_size.w, minute_height },
+    });
+}
+
+void on_unobstructed_area_change( AnimationProgress progress, void* context )
+{
+    update_app_layout( (App*)context );
+}
+
 void app_init_layout( App app[ static 1 ] )
 {
-    const GSize window_size = layer_get_bounds( window_get_root_layer( app->window ) ).size;
+    const GSize window_size = layer_get_unobstructed_bounds( window_get_root_layer( app->window ) ).size;
 
     uint16_t month_height, day_height, hour_height, minute_height;
     month_height = day_height = hour_height = minute_height = 0;
@@ -169,14 +213,6 @@ void app_init_layout( App app[ static 1 ] )
         hour_height = minute_height = ( window_size.h - 2 * month_height ) / 2;
     }
 
-    // #define TRACE(fmt, expr) APP_LOG(APP_LOG_LEVEL_DEBUG, #expr " = " fmt, expr)
-    #define TRACE(fmt, expr)
-    TRACE("%p", time_slider_month_label);
-    TRACE("%p", time_slider_day_label);
-    TRACE("%p", time_slider_hour_label);
-    TRACE("%p", time_slider_minute_label);
-    TRACE("%p", slider_create);
-
     #define READ_PERSISTENT_COLOR( identifier, default )\
         !persist_exists( identifier ) ? default : GColorFromHEX( persist_read_int( identifier ) )
 
@@ -191,8 +227,6 @@ void app_init_layout( App app[ static 1 ] )
 
     SliderCreateInfo month_slider_create_info = {
          .frame={
-            // .origin={ 0, 1 * ( window_size.h / 5 ) + 1 },
-            // .size={ window_size.w, window_size.h / 5 },
             .origin={ 0, 0 },
             .size={ window_size.w, month_height },
         },
@@ -206,13 +240,10 @@ void app_init_layout( App app[ static 1 ] )
         .progress_func=_time_slider_month_progress,       
     };
      
-    TRACE("%p", month_slider_create_info.label_func);
     GUARD( app->monthSlider = slider_create( &month_slider_create_info ), goto give_up );
 
     const SliderCreateInfo day_slider_create_info = {
         .frame={
-            // .origin={ 0, 2 * ( window_size.h / 5 ) + 1 },
-            // .size={ window_size.w, window_size.h / 5 },
             .origin={ 0, month_height },
             .size={ window_size.w, day_height },
         },
@@ -226,13 +257,10 @@ void app_init_layout( App app[ static 1 ] )
         .progress_func=_time_slider_day_progress,
     };
 
-    TRACE("%p", day_slider_create_info.label_func);
     GUARD( app->daySlider = slider_create( &day_slider_create_info ), goto give_up );
 
     const SliderCreateInfo hour_slider_create_info = {
         .frame={
-            // .origin={ 0, 3 * ( window_size.h / 5 ) + 1 },
-            // .size={ window_size.w, window_size.h / 5 },
             .origin={ 0, month_height + day_height },
             .size={ window_size.w, hour_height },
         },
@@ -246,13 +274,10 @@ void app_init_layout( App app[ static 1 ] )
         .progress_func=_time_slider_hour_progress,
     };
 
-    TRACE("%p", hour_slider_create_info.label_func);
     GUARD( app->hourSlider = slider_create( &hour_slider_create_info ), goto give_up );
 
     SliderCreateInfo minute_slider_create_info = {
         .frame={
-            // .origin={ 0, 4 * ( window_size.h / 5 ) + 1 },
-            // .size={ window_size.w, window_size.h / 5 + 1 },
             .origin={ 0, month_height + day_height + hour_height },
             .size={ window_size.w, minute_height },
         },
@@ -268,10 +293,10 @@ void app_init_layout( App app[ static 1 ] )
 
     minute_slider_create_info.frame.size.h = window_size.h - ( minute_slider_create_info.frame.origin.y );
 
-    TRACE("%p", minute_slider_create_info.label_func);
     GUARD( app->minuteSlider = slider_create( &minute_slider_create_info ), goto give_up );
 
-    // layer_add_child( window_get_root_layer( app->window ), slider_get_layer( app->yearSlider ) );
+    unobstructed_area_service_subscribe( (UnobstructedAreaHandlers){ .change=on_unobstructed_area_change }, app );
+
     layer_add_child( window_get_root_layer( app->window ), slider_get_layer( app->monthSlider ) );
     layer_add_child( window_get_root_layer( app->window ), slider_get_layer( app->daySlider ) );
     layer_add_child( window_get_root_layer( app->window ), slider_get_layer( app->hourSlider ) );
