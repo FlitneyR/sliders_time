@@ -260,50 +260,45 @@ void time_slider_minute_label( Slider* slider, GContext* ctx, GRect bounds, int 
     draw_slider_label( slider, ctx, bounds, buffer, data->minuteFont.font, data->minuteFont.bottomPadding );
 }
 
+uint8_t get_progress( time_t from, time_t to, time_t sample )
+{
+    int16_t value = 256 * (sample - from) / (to - from);
+    return value > UINT8_MAX ? UINT8_MAX : value < 0 ? 0 : value;
+}
+
+#define PROGRESS_FUNC( aspect ) \
+    const TimeSliderData* const data = slider_get_context( slider );\
+    GUARD( data, return 0 );\
+    tm start, now, end;\
+    start = now = end = data->time;\
+    memset(&start, 0, __offsetof(tm, aspect));\
+    memset(&end, 0, __offsetof(tm, aspect));\
+    end.aspect += 1;\
+    return get_progress( mktime( &start ), mktime( &end ), mktime( &now ) );\
+
 uint8_t time_slider_year_progress( Slider* slider )
 {
-    const TimeSliderData* const data = slider_get_context( slider );
-    GUARD( data, return 0 );
-
-    return 255 * ( data->time.tm_mon - 1 ) / 11;
+    PROGRESS_FUNC( tm_year );
 }
 
 uint8_t time_slider_month_progress( Slider* slider )
 {
-    const TimeSliderData* const data = slider_get_context( slider );
-    GUARD( data, return 0 );
-
-    tm last_day_of_month = data->time;
-    last_day_of_month.tm_mon += 1;
-    last_day_of_month.tm_mday = 0;
-
-    const uint8_t days_in_month = localtime( &(time_t){ mktime( &last_day_of_month ) } )->tm_mday;
-
-    return ( 255 * ( data->time.tm_mday - 1 ) / ( days_in_month - 1 ) ) + ( time_slider_day_progress( slider ) / days_in_month );
+    PROGRESS_FUNC( tm_mon );
 }
 
 uint8_t time_slider_day_progress( Slider* slider )
 {
-    const TimeSliderData* const data = slider_get_context( slider );
-    GUARD( data, return 0 );
-
-    return ( 255 * data->time.tm_hour / 24 ) + ( time_slider_hour_progress( slider ) / 24 );
+    PROGRESS_FUNC( tm_mday );
 }
 
 uint8_t time_slider_hour_progress( Slider* slider )
 {
-    const TimeSliderData* const data = slider_get_context( slider );
-    GUARD( data, return 0 );
-
-    return ( 255 * data->time.tm_min / 60 ) + ( time_slider_minute_progress( slider ) / 60 );
+    PROGRESS_FUNC( tm_hour );
 }
 
 uint8_t time_slider_minute_progress( Slider* slider )
 {
-    const TimeSliderData* const data = slider_get_context( slider );
-    GUARD( data, return 0 );
-
-    return 255 * data->time.tm_sec / 60;
+    PROGRESS_FUNC( tm_min );
 }
 
 // #pragma endregion Time slider funcs
