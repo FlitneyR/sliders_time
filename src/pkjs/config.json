@@ -53,10 +53,15 @@
         "type": "section",
         "items": [
             {
-                "type": "toggle",
-                "messageKey": "PerSecondUpdate",
-                "label": "Per-second update",
-                "defaultValue": "false"
+                "type": "radiogroup",
+                "messageKey": "AnimationMode",
+                "label": "Animation Mode",
+                "defaultValue": "per_minute_animated",
+                "options": [
+                    { "label": "Animated update once per minute", "value": "animated_per_minute" },
+                    { "label": "Update once per minute", "value": "per_minute" },
+                    { "label": "Update once per second", "value": "per_second" }
+                ]
             }
         ]
     },

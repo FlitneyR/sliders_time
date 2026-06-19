@@ -31,16 +31,20 @@ void app_destroy( App* app )
 
 // #pragma region Init / Deinit
 
-static void on_tick( tm* time, TimeUnits units ) { app_on_tick( window_get_user_data( window_stack_get_top_window() ), time, units ); }
 static void on_main_window_load( Window* window ) { app_init_layout( window_get_user_data( window ) ); }
-static void on_main_window_appear( Window* window ) { SUBSCRIBE_TICK_SERVER( on_tick, app_get_tick_rate( window_get_user_data( window ) ) ); }
+static void on_tick( tm* time, TimeUnits units ) { app_on_tick( window_get_user_data( window_stack_get_top_window() ), time, units, true ); }
+static void on_main_window_appear( Window* window ) {
+    App* app = window_get_user_data( window );
+    tick_timer_service_subscribe( app_get_tick_rate( app ), on_tick );
+    app_on_tick( app, localtime( &(time_t){ time( NULL ) } ), ~0, false );
+}
 static void on_main_window_disappear( Window* window ) { tick_timer_service_unsubscribe(); }
 static void on_main_window_unload( Window* window ) { app_destroy_layout( window_get_user_data( window ) ); }
 
 bool app_init( App app[ static 1 ] )
 {
     *app = (App){ 0 };
-    app->perSecondUpdate = persist_read_bool( PER_SECOND_UPDATE );
+    app->animationMode = persist_read_int( ANIMATION_MODE );
 
     app_message_open( 1024, 0 );
 
@@ -77,6 +81,13 @@ uint8_t _time_slider_minute_progress( Slider* slider ) { return time_slider_minu
 
 typedef struct ColorScheme { GColor8 fg, bg, fg_alt, bg_alt; } ColorScheme;
 
+static AnimationMode get_animation_mode(const char* name) {
+    if (!strcmp(name, "per_minute")) return AnimationMode_PerMinute;
+    if (!strcmp(name, "per_second")) return AnimationMode_PerSecond;
+    if (!strcmp(name, "animated_per_minute")) return AnimationMode_AnimatedPerMinute;
+    return AnimationMode_PerMinute;
+}
+
 void received_callback( DictionaryIterator* iterator, void* context )
 {
     // APP_LOG( APP_LOG_LEVEL_DEBUG, "Received a message" );
@@ -89,7 +100,7 @@ void received_callback( DictionaryIterator* iterator, void* context )
     const Tuple* const fg_color = dict_find( iterator, MESSAGE_KEY_PrimaryForegroundColour );
     const Tuple* const bg_color_alt = dict_find( iterator, MESSAGE_KEY_SecondaryBackgroundColour );
     const Tuple* const fg_color_alt = dict_find( iterator, MESSAGE_KEY_SecondaryForegroundColour );
-    const Tuple* const per_second_update = dict_find( iterator, MESSAGE_KEY_PerSecondUpdate );
+    const Tuple* const animation_mode = dict_find( iterator, MESSAGE_KEY_AnimationMode );
 
     if ( bg_color )
     {
@@ -123,10 +134,10 @@ void received_callback( DictionaryIterator* iterator, void* context )
         slider_set_foreground_color( app->hourSlider, GColorFromHEX( fg_color_alt->value->int32 ) );
     }
 
-    if ( per_second_update )
+    if ( animation_mode )
     {
-        app->perSecondUpdate = per_second_update->value->int8;
-        persist_write_bool( PER_SECOND_UPDATE, app->perSecondUpdate );
+        app->animationMode = get_animation_mode( animation_mode->value->cstring );
+        persist_write_int( ANIMATION_MODE, app->animationMode );
         on_main_window_appear( app->window );
     }
 }
@@ -316,7 +327,8 @@ void app_destroy_layout( App app[ static 1 ] )
     app_message_set_context( NULL );
     app_message_deregister_callbacks();
 
-    // CHECKED_FREE( slider_destroy, app->yearSlider );
+    CHECKED_FREE( animation_destroy, app->animation );
+
     CHECKED_FREE( slider_destroy, app->monthSlider );
     CHECKED_FREE( slider_destroy, app->daySlider );
     CHECKED_FREE( slider_destroy, app->hourSlider );
@@ -329,21 +341,102 @@ void app_destroy_layout( App app[ static 1 ] )
 
 TimeUnits app_get_tick_rate( App app[ static 1 ] )
 {
-    return app->perSecondUpdate ? SECOND_UNIT : MINUTE_UNIT;
+    return app->animationMode == AnimationMode_PerSecond ? SECOND_UNIT : MINUTE_UNIT;
 }
 
-void app_on_tick( App app[ static 1 ], const tm time[ static 1 ], TimeUnits units )
-{
-    app->timeSliderData.time = *time;
+typedef struct AnimationContext {
+    App* app;
+    time_t startTime;
+    time_t endTime;
+} AnimationContext;
 
-    if ( !app->perSecondUpdate )
+void animation_implementation_update( Animation* animation, AnimationProgress progress )
+{
+    AnimationContext* context = animation_get_context( animation );
+    time_t time = context->startTime + ( ( context->endTime - context->startTime ) * progress ) / ANIMATION_NORMALIZED_MAX;
+    context->app->timeSliderData.time = *(tm*)localtime( &time );
+
+    slider_set_context( context->app->monthSlider, &context->app->timeSliderData );
+    slider_set_context( context->app->daySlider, &context->app->timeSliderData );
+    slider_set_context( context->app->hourSlider, &context->app->timeSliderData );
+    slider_set_context( context->app->minuteSlider, &context->app->timeSliderData );
+}
+
+void animation_implementation_teardown( Animation* animation )
+{
+    AnimationContext* context = animation_get_context( animation );
+    context->app->animation = NULL; // make sure the app doesn't try to destroy this animation as well
+    free( context );
+}
+
+AnimationImplementation g_animationImplementation = {
+    .update=animation_implementation_update,
+    .teardown=animation_implementation_teardown,
+};
+
+static AnimationProgress bounce_curve( AnimationProgress linear )
+{
+    if ( 2 * linear < ANIMATION_NORMALIZED_MAX )
+    {
+        AnimationProgress value = linear;
+        value *= 2;
+        value *= value;
+        value /= ANIMATION_NORMALIZED_MAX;
+        return value;
+    }
+    else
+    {
+        AnimationProgress value = linear;
+        value -= 3 * ANIMATION_NORMALIZED_MAX / 4;
+        value *= value;
+        value /= ANIMATION_NORMALIZED_MAX;
+        value *= 8;
+        value = ANIMATION_NORMALIZED_MAX / 2 + value;
+        return value;
+    }
+}
+
+void app_on_tick( App app[ static 1 ], const tm time[ static 1 ], TimeUnits units, bool real )
+{
+    if ( app->animationMode == AnimationMode_PerSecond )
+    {
+        app->timeSliderData.time = *time;
+        slider_set_context( app->monthSlider,  &app->timeSliderData );
+        slider_set_context( app->daySlider,    &app->timeSliderData );
+        slider_set_context( app->hourSlider,   &app->timeSliderData );
+        slider_set_context( app->minuteSlider, &app->timeSliderData );
+    }
+
+    if ( ( app->animationMode == AnimationMode_PerMinute ) || ( ( app->animationMode == AnimationMode_AnimatedPerMinute ) && !real ) )
+    {
+        app->timeSliderData.time = *time;
         app->timeSliderData.time.tm_sec = 30;
 
-    // if ( units & MONTH_UNIT  ) slider_set_context( app->yearSlider,   &app->timeSliderData );
-    /* if ( units & DAY_UNIT    ) */ slider_set_context( app->monthSlider,  &app->timeSliderData );
-    /* if ( units & HOUR_UNIT   ) */ slider_set_context( app->daySlider,    &app->timeSliderData );
-    /* if ( units & MINUTE_UNIT ) */ slider_set_context( app->hourSlider,   &app->timeSliderData );
-    /* if ( units & SECOND_UNIT ) */ slider_set_context( app->minuteSlider, &app->timeSliderData );
+        slider_set_context( app->monthSlider,  &app->timeSliderData );
+        slider_set_context( app->daySlider,    &app->timeSliderData );
+        slider_set_context( app->hourSlider,   &app->timeSliderData );
+        slider_set_context( app->minuteSlider, &app->timeSliderData );
+    }
+
+    if ( ( app->animationMode == AnimationMode_AnimatedPerMinute ) && real )
+    {
+        CHECKED_FREE( animation_destroy, app->animation );
+
+        tm end_time = *time;
+        end_time.tm_sec = 30;
+
+        AnimationContext* animation_context = calloc( 1, sizeof *animation_context );
+        animation_context->app = app;
+        animation_context->startTime = mktime( &app->timeSliderData.time );
+        animation_context->endTime = mktime( &end_time );
+
+        app->animation = animation_create();
+        animation_set_duration( app->animation, 1000 );
+        animation_set_custom_curve( app->animation, bounce_curve );
+        animation_set_handlers( app->animation, (AnimationHandlers){}, animation_context );
+        animation_set_implementation( app->animation, &g_animationImplementation );
+        animation_schedule( app->animation );
+    }
 }
 
 // #pragma endregion App private functions
