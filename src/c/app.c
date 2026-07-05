@@ -101,18 +101,6 @@ void app_deinit( App app[ static 1 ] )
     app_destroy_layout( app );
 }
 
-void _time_slider_year_label( Slider* slider, GContext* ctx, GRect bounds, int offset ) { time_slider_year_label( slider, ctx, bounds, offset ); }
-void _time_slider_month_label( Slider* slider, GContext* ctx, GRect bounds, int offset ) { time_slider_month_label( slider, ctx, bounds, offset ); }
-void _time_slider_day_label( Slider* slider, GContext* ctx, GRect bounds, int offset ) { time_slider_day_label( slider, ctx, bounds, offset ); }
-void _time_slider_hour_label( Slider* slider, GContext* ctx, GRect bounds, int offset ) { time_slider_hour_label( slider, ctx, bounds, offset ); }
-void _time_slider_minute_label( Slider* slider, GContext* ctx, GRect bounds, int offset ) { time_slider_minute_label( slider, ctx, bounds, offset ); }
-
-uint8_t _time_slider_year_progress( Slider* slider ) { return time_slider_year_progress( slider ); }
-uint8_t _time_slider_month_progress( Slider* slider ) { return time_slider_month_progress( slider ); }
-uint8_t _time_slider_day_progress( Slider* slider ) { return time_slider_day_progress( slider ); }
-uint8_t _time_slider_hour_progress( Slider* slider ) { return time_slider_hour_progress( slider ); }
-uint8_t _time_slider_minute_progress( Slider* slider ) { return time_slider_minute_progress( slider ); }
-
 typedef struct ColorScheme { GColor8 fg, bg, fg_alt, bg_alt; } ColorScheme;
 
 static AnimationMode get_animation_mode( const char* name )
@@ -284,8 +272,8 @@ void app_init_layout( App app[ static 1 ] )
         .foregroundColor = cs.fg,
 
         .context = NULL,
-        .label_func=_time_slider_month_label,
-        .progress_func=_time_slider_month_progress,       
+        .label_func=time_slider_month_label,
+        .progress_func=time_slider_month_progress,       
     };
      
     GUARD( app->monthSlider = slider_create( &month_slider_create_info ), goto give_up );
@@ -301,8 +289,8 @@ void app_init_layout( App app[ static 1 ] )
         .foregroundColor = cs.fg_alt,
 
         .context = NULL,
-        .label_func=_time_slider_day_label,
-        .progress_func=_time_slider_day_progress,
+        .label_func=time_slider_day_label,
+        .progress_func=time_slider_day_progress,
     };
 
     GUARD( app->daySlider = slider_create( &day_slider_create_info ), goto give_up );
@@ -314,12 +302,13 @@ void app_init_layout( App app[ static 1 ] )
         },
 
         .showNeighbours = 2,
+        .labelWidth = 60,
         .backgroundColor = cs.bg,
         .foregroundColor = cs.fg,
 
         .context = NULL,
-        .label_func=_time_slider_hour_label,
-        .progress_func=_time_slider_hour_progress,
+        .label_func=time_slider_hour_label,
+        .progress_func=time_slider_hour_progress,
     };
 
     GUARD( app->hourSlider = slider_create( &hour_slider_create_info ), goto give_up );
@@ -331,12 +320,13 @@ void app_init_layout( App app[ static 1 ] )
         },
 
         .showNeighbours = 2,
+        .labelWidth = 60,
         .backgroundColor = cs.bg_alt,
         .foregroundColor = cs.fg_alt,
 
         .context = NULL,
-        .label_func=_time_slider_minute_label,
-        .progress_func=_time_slider_minute_progress,
+        .label_func=time_slider_minute_label,
+        .progress_func=time_slider_minute_progress,
     };
 
     minute_slider_create_info.frame.size.h = window_size.h - ( minute_slider_create_info.frame.origin.y );

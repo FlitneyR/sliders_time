@@ -28,11 +28,15 @@ Slider* slider_create( const SliderCreateInfo* const create_info )
         .backgroundColor = create_info->backgroundColor,
         .foregroundColor = create_info->foregroundColor,
         .showNeighbours = create_info->showNeighbours,
+        .labelWidth = create_info->labelWidth,
 
         .context = create_info->context,
         .draw_label = create_info->label_func,
         .get_progress = create_info->progress_func,
     };
+
+    if ( slider->labelWidth == 0 )
+        slider->labelWidth = create_info->frame.size.w / ( 2 * slider->showNeighbours );
 
     layer_set_update_proc( layer, slider_layer_update_proc );
 
@@ -81,7 +85,7 @@ void slider_layer_update_proc( Layer* layer, GContext* ctx )
 
     const GSize label_size = {
         .h=layer_size.h,
-        .w=layer_size.w / ( 2 * slider->showNeighbours ),
+        .w=slider->labelWidth,
     };
 
     // show past neighbours, then future neighbours
@@ -89,7 +93,7 @@ void slider_layer_update_proc( Layer* layer, GContext* ctx )
     {
         slider->draw_label( slider, ctx, (GRect){
             .origin = {
-                .x = layer_size.w / 2 - ( label_size.w * slider->currentProgress / 256 ) - neighbour * label_size.w,
+                .x = layer_size.w / 2 - ( label_size.w * slider->currentProgress.numerator / slider->currentProgress.denominator ) - neighbour * label_size.w,
                 .y = 0,
             },
             .size = label_size,
@@ -97,7 +101,7 @@ void slider_layer_update_proc( Layer* layer, GContext* ctx )
 
         slider->draw_label( slider, ctx, (GRect){
             .origin = {
-                .x = layer_size.w / 2 - ( label_size.w * slider->currentProgress / 256 ) + neighbour * label_size.w,
+                .x = layer_size.w / 2 - ( label_size.w * slider->currentProgress.numerator / slider->currentProgress.denominator ) + neighbour * label_size.w,
                 .y = 0,
             },
             .size = label_size,
@@ -107,7 +111,7 @@ void slider_layer_update_proc( Layer* layer, GContext* ctx )
     // show current
     slider->draw_label( slider, ctx, (GRect){
         .origin = {
-            .x = layer_size.w / 2 - ( label_size.w * slider->currentProgress / 256 ),
+            .x = layer_size.w / 2 - ( label_size.w * slider->currentProgress.numerator / slider->currentProgress.denominator ),
             .y = 0,
         },
         .size = label_size,
@@ -260,15 +264,14 @@ void time_slider_minute_label( Slider* slider, GContext* ctx, GRect bounds, int 
     draw_slider_label( slider, ctx, bounds, buffer, data->minuteFont.font, data->minuteFont.bottomPadding );
 }
 
-uint8_t get_progress( time_t from, time_t to, time_t sample )
+Ratio get_progress( time_t from, time_t to, time_t sample )
 {
-    int16_t value = 256 * (sample - from) / (to - from);
-    return value > UINT8_MAX ? UINT8_MAX : value < 0 ? 0 : value;
+    return (Ratio){ sample - from, to - from };
 }
 
 #define PROGRESS_FUNC( aspect ) \
     const TimeSliderData* const data = slider_get_context( slider );\
-    GUARD( data, return 0 );\
+    GUARD( data, return (Ratio){ 0, 1 } );\
     tm start, now, end;\
     start = now = end = data->time;\
     memset(&start, 0, __offsetof(tm, aspect));\
@@ -276,27 +279,27 @@ uint8_t get_progress( time_t from, time_t to, time_t sample )
     end.aspect += 1;\
     return get_progress( mktime( &start ), mktime( &end ), mktime( &now ) );\
 
-uint8_t time_slider_year_progress( Slider* slider )
+Ratio time_slider_year_progress( Slider* slider )
 {
     PROGRESS_FUNC( tm_year );
 }
 
-uint8_t time_slider_month_progress( Slider* slider )
+Ratio time_slider_month_progress( Slider* slider )
 {
     PROGRESS_FUNC( tm_mon );
 }
 
-uint8_t time_slider_day_progress( Slider* slider )
+Ratio time_slider_day_progress( Slider* slider )
 {
     PROGRESS_FUNC( tm_mday );
 }
 
-uint8_t time_slider_hour_progress( Slider* slider )
+Ratio time_slider_hour_progress( Slider* slider )
 {
     PROGRESS_FUNC( tm_hour );
 }
 
-uint8_t time_slider_minute_progress( Slider* slider )
+Ratio time_slider_minute_progress( Slider* slider )
 {
     PROGRESS_FUNC( tm_min );
 }

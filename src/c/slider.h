@@ -8,9 +8,8 @@ typedef struct Slider Slider;
 // draw the current + offset label into the provided rect
 typedef void (*SliderDrawLabelFunc)( Slider* slider, GContext* ctx, GRect bounds, int offset );
 
-// returns a number between 0 indicating that the slider is at the current label
-// and 256 indicating that the slider is at the next label
-typedef uint8_t (*SliderGetProgressFunc)( Slider* slider );
+typedef struct Ratio { int numerator, denominator; } Ratio;
+typedef Ratio (*SliderGetProgressFunc)( Slider* slider );
 
 typedef struct SliderCreateInfo {
     GRect frame;
@@ -18,6 +17,7 @@ typedef struct SliderCreateInfo {
     GColor8 foregroundColor;
 
     uint8_t showNeighbours;
+    uint16_t labelWidth;
 
     void* context;
     SliderDrawLabelFunc label_func;
@@ -60,11 +60,11 @@ void time_slider_day_label( Slider* slider, GContext* ctx, GRect bounds, int off
 void time_slider_hour_label( Slider* slider, GContext* ctx, GRect bounds, int offset );
 void time_slider_minute_label( Slider* slider, GContext* ctx, GRect bounds, int offset );
 
-uint8_t time_slider_year_progress( Slider* slider );
-uint8_t time_slider_month_progress( Slider* slider );
-uint8_t time_slider_day_progress( Slider* slider );
-uint8_t time_slider_hour_progress( Slider* slider );
-uint8_t time_slider_minute_progress( Slider* slider );
+Ratio time_slider_year_progress( Slider* slider );
+Ratio time_slider_month_progress( Slider* slider );
+Ratio time_slider_day_progress( Slider* slider );
+Ratio time_slider_hour_progress( Slider* slider );
+Ratio time_slider_minute_progress( Slider* slider );
 
 // #pragma endregion Time slider
 

@@ -9,8 +9,9 @@ struct Slider {
     GColor8 foregroundColor;
 
     void* context;
-    uint8_t currentProgress;
+    Ratio currentProgress;
     uint8_t showNeighbours;
+    uint16_t labelWidth;
 
     SliderDrawLabelFunc draw_label;
     SliderGetProgressFunc get_progress;
