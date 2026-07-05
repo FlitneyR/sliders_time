@@ -56,8 +56,10 @@
                 "type": "radiogroup",
                 "messageKey": "AnimationMode",
                 "label": "Animation Mode",
-                "defaultValue": "per_minute_animated",
+                "defaultValue": "animated_per_minute_backlight",
                 "options": [
+                    { "label": "Animated update once per minute, on per second when backlight is on", "value": "animated_per_minute_backlight" },
+                    { "label": "Update once per minute, on per second when backlight is on", "value": "per_minute_backlight" },
                     { "label": "Animated update once per minute", "value": "animated_per_minute" },
                     { "label": "Update once per minute", "value": "per_minute" },
                     { "label": "Update once per second", "value": "per_second" }

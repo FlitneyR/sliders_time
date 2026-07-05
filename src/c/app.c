@@ -31,20 +31,54 @@ void app_destroy( App* app )
 
 // #pragma region Init / Deinit
 
-static void on_main_window_load( Window* window ) { app_init_layout( window_get_user_data( window ) ); }
-static void on_tick( tm* time, TimeUnits units ) { app_on_tick( window_get_user_data( window_stack_get_top_window() ), time, units, true ); }
-static void on_main_window_appear( Window* window ) {
-    App* app = window_get_user_data( window );
+static void on_main_window_load( Window* window )
+{
+    app_init_layout( window_get_user_data( window ) );
+}
+
+static void on_tick( tm* time, TimeUnits units )
+{
+    app_on_tick( window_get_user_data( window_stack_get_top_window() ), time, units, true );
+}
+
+static void app_update_tick_rate( App app[ static 1 ] )
+{
+    tick_timer_service_unsubscribe();
     tick_timer_service_subscribe( app_get_tick_rate( app ), on_tick );
     app_on_tick( app, localtime( &(time_t){ time( NULL ) } ), ~0, false );
 }
-static void on_main_window_disappear( Window* window ) { tick_timer_service_unsubscribe(); }
-static void on_main_window_unload( Window* window ) { app_destroy_layout( window_get_user_data( window ) ); }
+
+static void on_backlight_state_changed( bool is_on )
+{
+    Window* window = window_stack_get_top_window();
+    App* app = window_get_user_data( window );
+    app_on_backlight_state_changed( app );
+}
+
+static void on_main_window_appear( Window* window )
+{
+    App* app = window_get_user_data( window );
+    app_update_tick_rate( app );
+    backlight_service_subscribe( on_backlight_state_changed );
+}
+
+static void on_main_window_disappear( Window* window )
+{
+    tick_timer_service_unsubscribe();
+    backlight_service_unsubscribe();
+}
+
+static void on_main_window_unload( Window* window )
+{
+    app_destroy_layout( window_get_user_data( window ) );
+}
 
 bool app_init( App app[ static 1 ] )
 {
     *app = (App){ 0 };
-    app->animationMode = persist_read_int( ANIMATION_MODE );
+    app->animationMode = persist_exists( ANIMATION_MODE )
+        ? persist_read_int( ANIMATION_MODE )
+        : AnimationMode_AnimatedPerMinuteBacklightPeek;
 
     app_message_open( 1024, 0 );
 
@@ -81,11 +115,14 @@ uint8_t _time_slider_minute_progress( Slider* slider ) { return time_slider_minu
 
 typedef struct ColorScheme { GColor8 fg, bg, fg_alt, bg_alt; } ColorScheme;
 
-static AnimationMode get_animation_mode(const char* name) {
-    if (!strcmp(name, "per_minute")) return AnimationMode_PerMinute;
-    if (!strcmp(name, "per_second")) return AnimationMode_PerSecond;
-    if (!strcmp(name, "animated_per_minute")) return AnimationMode_AnimatedPerMinute;
-    return AnimationMode_PerMinute;
+static AnimationMode get_animation_mode( const char* name )
+{
+    if ( !strcmp( name, "per_minute" ) ) return AnimationMode_PerMinute;
+    if ( !strcmp( name, "per_second" ) ) return AnimationMode_PerSecond;
+    if ( !strcmp( name, "animated_per_minute" ) ) return AnimationMode_AnimatedPerMinute;
+    if ( !strcmp( name, "per_minute_backlight" ) ) return AnimationMode_PerMinuteBacklightPeek;
+    if ( !strcmp( name, "animated_per_minute_backlight" ) ) return AnimationMode_AnimatedPerMinuteBacklightPeek;
+    return AnimationMode_AnimatedPerMinuteBacklightPeek;
 }
 
 void received_callback( DictionaryIterator* iterator, void* context )
@@ -341,18 +378,30 @@ void app_destroy_layout( App app[ static 1 ] )
 
 TimeUnits app_get_tick_rate( App app[ static 1 ] )
 {
-    return app->animationMode == AnimationMode_PerSecond ? SECOND_UNIT : MINUTE_UNIT;
+    if ( ( app->animationMode & AnimationMode_BacklightPeekFlag ) && light_is_on() )
+        return SECOND_UNIT;
+
+    switch ( app->animationMode & AnimationMode_ModeMask )
+    {
+    case AnimationMode_PerSecond:
+        return SECOND_UNIT;
+    case AnimationMode_PerMinute:
+    case AnimationMode_AnimatedPerMinute:
+        return MINUTE_UNIT;
+    default:
+        GUARD(!"invalid app->animationMode", return SECOND_UNIT);
+    }
 }
 
-typedef struct AnimationContext {
+typedef struct GenericTimeTransitionAnimationContext {
     App* app;
     time_t startTime;
     time_t endTime;
-} AnimationContext;
+} GenericTimeTransitionAnimationContext;
 
-void animation_implementation_update( Animation* animation, AnimationProgress progress )
+void generic_time_transition_implementation_update( Animation* animation, AnimationProgress progress )
 {
-    AnimationContext* context = animation_get_context( animation );
+    GenericTimeTransitionAnimationContext* context = animation_get_context( animation );
     time_t time = context->startTime + ( ( context->endTime - context->startTime ) * progress ) / ANIMATION_NORMALIZED_MAX;
     context->app->timeSliderData.time = *(tm*)localtime( &time );
 
@@ -362,16 +411,16 @@ void animation_implementation_update( Animation* animation, AnimationProgress pr
     slider_set_context( context->app->minuteSlider, &context->app->timeSliderData );
 }
 
-void animation_implementation_teardown( Animation* animation )
+void minute_tick_animation_implementation_teardown( Animation* animation )
 {
-    AnimationContext* context = animation_get_context( animation );
+    GenericTimeTransitionAnimationContext* context = animation_get_context( animation );
     context->app->animation = NULL; // make sure the app doesn't try to destroy this animation as well
     free( context );
 }
 
-AnimationImplementation g_animationImplementation = {
-    .update=animation_implementation_update,
-    .teardown=animation_implementation_teardown,
+AnimationImplementation g_minuteTickAnimationImplementation = {
+    .update=generic_time_transition_implementation_update,
+    .teardown=minute_tick_animation_implementation_teardown,
 };
 
 static AnimationProgress bounce_curve( AnimationProgress linear )
@@ -398,34 +447,37 @@ static AnimationProgress bounce_curve( AnimationProgress linear )
 
 void app_on_tick( App app[ static 1 ], const tm time[ static 1 ], TimeUnits units, bool real )
 {
-    if ( app->animationMode == AnimationMode_PerSecond )
+    AnimationMode animation_mode = app->animationMode & AnimationMode_ModeMask;
+
+    if ( ( app->animationMode & AnimationMode_BacklightPeekFlag ) && light_is_on() )
+        animation_mode = AnimationMode_PerSecond;
+
+    if ( ( animation_mode == AnimationMode_AnimatedPerMinute ) && !real )
+        animation_mode = AnimationMode_PerMinute;
+
+    switch ( animation_mode )
+    {
+    case AnimationMode_PerSecond:
+    case AnimationMode_PerMinute:
     {
         app->timeSliderData.time = *time;
+        if ( animation_mode == AnimationMode_PerMinute )
+            app->timeSliderData.time.tm_sec = 30;
+
         slider_set_context( app->monthSlider,  &app->timeSliderData );
         slider_set_context( app->daySlider,    &app->timeSliderData );
         slider_set_context( app->hourSlider,   &app->timeSliderData );
         slider_set_context( app->minuteSlider, &app->timeSliderData );
+        break;
     }
-
-    if ( ( app->animationMode == AnimationMode_PerMinute ) || ( ( app->animationMode == AnimationMode_AnimatedPerMinute ) && !real ) )
-    {
-        app->timeSliderData.time = *time;
-        app->timeSliderData.time.tm_sec = 30;
-
-        slider_set_context( app->monthSlider,  &app->timeSliderData );
-        slider_set_context( app->daySlider,    &app->timeSliderData );
-        slider_set_context( app->hourSlider,   &app->timeSliderData );
-        slider_set_context( app->minuteSlider, &app->timeSliderData );
-    }
-
-    if ( ( app->animationMode == AnimationMode_AnimatedPerMinute ) && real )
+    case AnimationMode_AnimatedPerMinute:
     {
         CHECKED_FREE( animation_destroy, app->animation );
 
         tm end_time = *time;
         end_time.tm_sec = 30;
 
-        AnimationContext* animation_context = calloc( 1, sizeof *animation_context );
+        GenericTimeTransitionAnimationContext* animation_context = calloc( 1, sizeof *animation_context );
         animation_context->app = app;
         animation_context->startTime = mktime( &app->timeSliderData.time );
         animation_context->endTime = mktime( &end_time );
@@ -434,9 +486,63 @@ void app_on_tick( App app[ static 1 ], const tm time[ static 1 ], TimeUnits unit
         animation_set_duration( app->animation, 1000 );
         animation_set_custom_curve( app->animation, bounce_curve );
         animation_set_handlers( app->animation, (AnimationHandlers){}, animation_context );
-        animation_set_implementation( app->animation, &g_animationImplementation );
+        animation_set_implementation( app->animation, &g_minuteTickAnimationImplementation );
         animation_schedule( app->animation );
+        break;
     }
+    default: break;
+    }
+}
+
+void tick_rate_transition_animation_implementation_setup( Animation* animation )
+{
+    tick_timer_service_unsubscribe();
+}
+
+void tick_rate_transition_animation_implementation_teardown( Animation* animation )
+{
+    GenericTimeTransitionAnimationContext* ctx = animation_get_context( animation );
+    ctx->app->animation = NULL;
+    app_update_tick_rate( ctx->app );
+    free( ctx );
+}
+
+AnimationImplementation g_tickRateTransitionAnimationImplementation = {
+    .setup=tick_rate_transition_animation_implementation_setup,
+    .update=generic_time_transition_implementation_update,
+    .teardown=tick_rate_transition_animation_implementation_teardown,
+};
+
+void app_on_backlight_state_changed( App app[ static 1 ] )
+{
+    if ( !( app->animationMode & AnimationMode_BacklightPeekFlag ) )
+        return;
+
+    CHECKED_FREE( animation_destroy, app->animation );
+
+    GenericTimeTransitionAnimationContext* animation_context = calloc( 1, sizeof *animation_context );
+    animation_context->app = app;
+
+    {
+        animation_context->startTime = mktime( &app->timeSliderData.time );
+        
+        time_t end_time = time( NULL );
+        if ( !light_is_on() )
+        {
+            tm temp = *(tm*)localtime( &end_time );
+            temp.tm_sec = 30;
+            end_time = mktime( &temp );
+        }
+
+        animation_context->endTime = end_time;
+    }
+
+    app->animation = animation_create();
+    animation_set_duration( app->animation, 250 );
+    animation_set_curve( app->animation, AnimationCurveEaseOut );
+    animation_set_handlers( app->animation, (AnimationHandlers){}, animation_context );
+    animation_set_implementation( app->animation, &g_tickRateTransitionAnimationImplementation );
+    animation_schedule( app->animation );
 }
 
 // #pragma endregion App private functions
